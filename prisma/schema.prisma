@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Example {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteContact {
+  id             Int     @id @default(autoincrement())
+  address_line_1 String
+  address_line_2 String
+  post_code      String
+  post_town      String
+  country        String?
+  telephone      String?
+  website        String?
+  latitude       String?
+  longitude      String?
+  Site           Site[]
+}
+
+model Site {
+  id            Int            @id @default(autoincrement())
+  site_id       Int            @unique
+  name          String
+  tldc_approved Boolean
+  timezone      String
+  foreign_key   String?
+  contact       SiteContact    @relation(fields: [siteContactId], references: [id])
+  timetables    Timetable[]
+  siteContactId Int
+  facilities    SiteFacility[]
+}
+
+model SiteFacilityType {
+  id   Int    @id
+  name String
+}
+
+model SiteFacility {
+  id               Int              @id @default(autoincrement())
+  facility_id      Int              @unique
+  name             String
+  tldc_approved    Boolean?
+  length           Float?
+  primary_name     String?
+  no_of_timetables Int?
+  site             Site?            @relation(fields: [siteId], references: [site_id])
+  siteId           Int?
+  TimetableEntry   TimetableEntry[]
+}
+
+model Timetable {
+  id           Int                @id @default(autoincrement())
+  timetable_id Int                @unique
+  name         String
+  sessions     TimetableSession[]
+  site         Site               @relation(fields: [siteId], references: [site_id])
+  siteId       Int
+}
+
+model TimetableSession {
+  id                  Int              @id @default(autoincrement())
+  timetablesession_id Int              @unique
+  name                String
+  description         String
+  category            String
+  Timetable           Timetable?       @relation(fields: [timetableId], references: [timetable_id])
+  timetableId         Int?
+  TimetableEntry      TimetableEntry[]
+
+  @@index([category], name: "category")
+}
+
+model TimetableEntry {
+  id                   Int              @id @default(autoincrement())
+  name                 String
+  date_time            DateTime
+  facility_name        String
+  is_cancelled         Boolean
+  session              TimetableSession @relation(fields: [timetable_session_id], references: [timetablesession_id])
+  timetable_session_id Int
+  facility             SiteFacility     @relation(fields: [facility_id], references: [facility_id])
+  facility_id          Int
+  instructor_name      String
+  level                Int
+}
