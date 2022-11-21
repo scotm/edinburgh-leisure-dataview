@@ -40,22 +40,21 @@ export const exampleRouter = router({
       },
       where: {
         is_cancelled: false,
-        date_time: {
-          gte: new Date(),
-        },
       },
     });
+    console.log(data.length);
     const newdata = data.map((item) => {
       return {
         name: item.name,
-        description: stripHTML(item.session.description),
+        description: stripHTML(
+          item.session.description.replaceAll("&nbsp;", " ")
+        ),
         date_time: item.date_time,
         instructor: item.instructor_name,
         site: {
           name: item.session.Timetable?.site.name,
           facility_name: item.facility.name,
         },
-
         level: item.level,
       };
     });

@@ -16,19 +16,6 @@ const sites = minimalsites;
 
 const key = "D8lafTKUXBelUzs2s33bTGU3j7MBfOEtNKn1bAoX";
 
-// Strip out HTML from a string
-function stripHTML(html: string) {
-  return html.replace(/(<([^>]+)>)/gi, "");
-}
-
-const test = stripHTML(
-  '<p><span style="font-size: 11pt; font-family: verdana, geneva;">Lane swimming session.&nbsp; No open water swimming available.</span></p>\r\n<p><span style="font-size: 11pt; font-family: verdana, geneva;"><strong><span style="text-decoration: underline;">No shallow water for weak or non-swimmers.</span></strong></span></p>\r\n<p><span style="font-family: verdana, geneva;"><strong>Adult to child ratio: </strong></span></p>\r\n<p><span style="font-family: verdana, geneva;"><strong>Under 5</strong> - One adult to one child with or without armbands or one adult to two children with armbands</span></p>\r\n<p><span style="font-family: verdana, geneva;"><strong>5 to 8 years old</strong> - One adult to two children with or without armbands</span></p>\r\n<p><span style="font-family: verdana, geneva;"><strong>Mixed Ages</strong> - One adult to one under 5 and one 5 to 8 years old if the under 5 is wearing armbands</span></p>'
-);
-console.log(test);
-
-// function stripHTML(html: string) {
-//   return html.replace(/(<([^>]+)>)/gi, "");
-// }
 // https://stackoverflow.com/questions/10011011/reading-a-local-json-file-in-node-js
 async function readJSONFromFile(filename: string) {
   try {
@@ -46,7 +33,7 @@ async function readJSONFromFile(filename: string) {
   return undefined;
 }
 
-// A basic function to cache and return the results of an API call
+// A basic function to return the results of an API call, and cache it for later
 async function getDataFromAPI(url: string) {
   const digest = md5.hashStr(url);
   const filename = `${__dirname}/data/${digest}.json`;
@@ -62,9 +49,10 @@ async function getDataFromAPI(url: string) {
   return result;
 }
 
-function getInverse(goop: Map<number, Array<number>>) {
+// Creates an inverted lookup map
+function getInverse(lookupMap: Map<number, Array<number>>) {
   const inverse = new Map<number, number>();
-  goop.forEach((value, key) => {
+  lookupMap.forEach((value, key) => {
     value.forEach((v) => {
       inverse.set(v, key);
     });
@@ -72,8 +60,8 @@ function getInverse(goop: Map<number, Array<number>>) {
   return inverse;
 }
 
+// Keeping these in file scope. They are used in multiple functions
 const siteTimetablesMap = new Map<number, Array<number>>();
-
 const facilities_seen = new Set<number>();
 
 async function main() {
@@ -85,10 +73,12 @@ async function main() {
     )
   )
     .then(async (responses) => {
+      // Validate the responses
       const confirmedSites = responses.map((response) =>
         siteValidator.parse(response)
       );
 
+      // Create the SiteFacility objects
       const facilities = confirmedSites
         .flatMap((site) => site.facilities)
         .filter((facility) => {
@@ -111,42 +101,42 @@ async function main() {
             },
           });
         })
-      ).then(async () => {
-        await Promise.all(
-          confirmedSites.map(async (site) => {
-            siteTimetablesMap.set(
-              site.id,
-              site.timetables.map((t) => t.id)
-            );
-            return prisma.site.create({
-              data: {
-                site_id: site.id,
-                name: site.name,
-                timezone: site.timezone ?? "Europe/London",
-                tldc_approved: site.tldc_approved,
-                facilities: {
-                  connect: site.facilities.map((facility) => {
-                    return { facility_id: facility.id };
-                  }),
-                },
-                contact: {
-                  create: {
-                    address_line_1: site.contact.address_line_1,
-                    address_line_2: site.contact.address_line_2,
-                    country: site.contact.country,
-                    latitude: site.contact.latitude,
-                    longitude: site.contact.longitude,
-                    post_code: site.contact.post_code,
-                    post_town: site.contact.post_town,
-                    telephone: site.contact.telephone,
-                    website: site.contact.website,
-                  },
+      );
+
+      await Promise.all(
+        confirmedSites.map(async (site) => {
+          siteTimetablesMap.set(
+            site.id,
+            site.timetables.map((t) => t.id)
+          );
+          return prisma.site.create({
+            data: {
+              site_id: site.id,
+              name: site.name,
+              timezone: site.timezone ?? "Europe/London",
+              tldc_approved: site.tldc_approved,
+              facilities: {
+                connect: site.facilities.map((facility) => ({
+                  facility_id: facility.id,
+                })),
+              },
+              contact: {
+                create: {
+                  address_line_1: site.contact.address_line_1,
+                  address_line_2: site.contact.address_line_2,
+                  country: site.contact.country,
+                  latitude: site.contact.latitude,
+                  longitude: site.contact.longitude,
+                  post_code: site.contact.post_code,
+                  post_town: site.contact.post_town,
+                  telephone: site.contact.telephone,
+                  website: site.contact.website,
                 },
               },
-            });
-          })
-        );
-      });
+            },
+          });
+        })
+      );
     })
     .then(async () => {
       // Get a really big list of all the timetable ids
@@ -180,7 +170,7 @@ async function main() {
               timetablesession_id: session.id,
               name: session.name,
               category: session.timetable_session_category.name,
-              description: stripHTML(session.description),
+              description: session.description,
             },
           });
         }
@@ -216,10 +206,10 @@ async function main() {
               .split("T")[0];
             return [
               getDataFromAPI(
-                `https://api.activeintime.com/v1/timetables/${timetable}/timetable_entries.json?key=${key}`
+                `https://api.activeintime.com/v1/timetables/${timetable}/timetable_entries.json?numberOfDays=7&key=${key}`
               ),
               getDataFromAPI(
-                `https://api.activeintime.com/v1/timetables/${timetable}/timetable_entries.json?fromDate=${seven_days_later}&key=${key}`
+                `https://api.activeintime.com/v1/timetables/${timetable}/timetable_entries.json?numberOfDays=7&fromDate=${seven_days_later}&key=${key}`
               ),
             ];
           })
