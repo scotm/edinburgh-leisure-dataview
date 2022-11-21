@@ -223,6 +223,7 @@ async function main() {
           await prisma.timetableEntry.create({
             data: {
               date_time: new Date(entry.date + "T" + entry.start_time),
+              end_time: new Date(entry.date + "T" + entry.end_time),
               facility_name: entry.facility_name,
               name: entry.timetable_session.name,
               instructor_name: entry.instructor?.display_name ?? "",

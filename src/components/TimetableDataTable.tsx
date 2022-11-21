@@ -22,9 +22,7 @@ function Filter({
   column,
   table,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   column: Column<any, unknown>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   table: Table<any>;
 }) {
   const firstValue = table
@@ -41,61 +39,63 @@ function Filter({
         : Array.from(facetedUniqueValues.keys()).sort(),
     [facetedUniqueValues, firstValue]
   );
-
-  return typeof firstValue === "number" ? (
-    <div>
-      <div className="flex space-x-2">
-        <DebouncedInput
-          type="number"
-          min={Number(column.getFacetedMinMaxValues()?.[0] ?? "")}
-          max={Number(column.getFacetedMinMaxValues()?.[1] ?? "")}
-          value={(columnFilterValue as [number, number])?.[0] ?? ""}
-          onChange={(value) =>
-            column.setFilterValue((old: [number, number]) => [value, old?.[1]])
-          }
-          placeholder={`Min ${
-            column.getFacetedMinMaxValues()?.[0]
-              ? `(${column.getFacetedMinMaxValues()?.[0]})`
-              : ""
-          }`}
-          className="w-24 rounded border shadow"
-        />
-        <DebouncedInput
-          type="number"
-          min={Number(column.getFacetedMinMaxValues()?.[0] ?? "")}
-          max={Number(column.getFacetedMinMaxValues()?.[1] ?? "")}
-          value={(columnFilterValue as [number, number])?.[1] ?? ""}
-          onChange={(value) =>
-            column.setFilterValue((old: [number, number]) => [old?.[0], value])
-          }
-          placeholder={`Max ${
-            column.getFacetedMinMaxValues()?.[1]
-              ? `(${column.getFacetedMinMaxValues()?.[1]})`
-              : ""
-          }`}
-          className="w-24 rounded border shadow"
-        />
+  if (typeof firstValue === "number") {
+    const minmax = column.getFacetedMinMaxValues();
+    return (
+      <div>
+        <div className="flex space-x-2">
+          <DebouncedInput
+            type="number"
+            min={Number(minmax?.[0] ?? "")}
+            max={Number(minmax?.[1] ?? "")}
+            value={(columnFilterValue as [number, number])?.[0] ?? ""}
+            onChange={(value) =>
+              column.setFilterValue((old: [number, number]) => [
+                value,
+                old?.[1],
+              ])
+            }
+            placeholder={`Min ${minmax?.[0] ? `(${minmax?.[0]})` : ""}`}
+            className="w-16 rounded border shadow"
+          />
+          <DebouncedInput
+            type="number"
+            min={Number(minmax?.[0] ?? "")}
+            max={Number(minmax?.[1] ?? "")}
+            value={(columnFilterValue as [number, number])?.[1] ?? ""}
+            onChange={(value) =>
+              column.setFilterValue((old: [number, number]) => [
+                old?.[0],
+                value,
+              ])
+            }
+            placeholder={`Max ${minmax?.[1] ? `(${minmax?.[1]})` : ""}`}
+            className="w-16 rounded border shadow"
+          />
+        </div>
+        <div className="h-1" />
       </div>
-      <div className="h-1" />
-    </div>
-  ) : (
-    <>
-      <datalist id={column.id + "list"}>
-        {sortedUniqueValues.slice(0, 5000).map((value: any) => (
-          <option value={value} key={value} />
-        ))}
-      </datalist>
-      <DebouncedInput
-        type="text"
-        value={(columnFilterValue ?? "") as string}
-        onChange={(value) => column.setFilterValue(value)}
-        placeholder={`Search... (${column.getFacetedUniqueValues().size})`}
-        className="w-36 rounded border shadow"
-        list={column.id + "list"}
-      />
-      <div className="h-1" />
-    </>
-  );
+    );
+  } else {
+    return (
+      <>
+        <datalist id={column.id + "list"}>
+          {sortedUniqueValues.slice(0, 5000).map((value: any) => (
+            <option value={value} key={value} />
+          ))}
+        </datalist>
+        <DebouncedInput
+          type="text"
+          value={(columnFilterValue ?? "") as string}
+          onChange={(value) => column.setFilterValue(value)}
+          placeholder={`Search... (${facetedUniqueValues.size})`}
+          className="w-36 rounded border shadow"
+          list={column.id + "list"}
+        />
+        <div className="h-1" />
+      </>
+    );
+  }
 }
 
 // A debounced input react component
@@ -121,7 +121,7 @@ function DebouncedInput({
     }, debounce);
 
     return () => clearTimeout(timeout);
-  }, [value]);
+  }, [value, debounce, onChange]);
 
   return (
     <input
@@ -137,26 +137,35 @@ export const TimetableDataTable: React.FC<Props> = ({ data }) => {
   const columns = [
     columnHelper.accessor("name", {
       header: () => <span>Name</span>,
+      filterFn: "includesString",
     }),
     columnHelper.accessor("site.name", {
       header: () => <span>Where</span>,
-      enableColumnFilter: true,
       filterFn: "includesString",
     }),
     columnHelper.accessor("site.facility_name", {
       header: () => <span>Facilty</span>,
-      enableColumnFilter: true,
       filterFn: "includesString",
     }),
-    columnHelper.accessor("date_time", {
-      cell: (info) => info.getValue().toLocaleString(),
+    columnHelper.accessor("date", {
+      cell: (info) => info.getValue(),
       header: () => <span>Date</span>,
+    }),
+    columnHelper.accessor("time", {
+      cell: (info) => info.getValue(),
+      header: () => <span>Time</span>,
       enableColumnFilter: false,
     }),
-    columnHelper.accessor("description", {
+    columnHelper.accessor("end_time", {
       cell: (info) => info.getValue(),
-      header: () => <span>Description</span>,
+      header: () => <span>Time</span>,
+      enableColumnFilter: false,
     }),
+    // columnHelper.accessor("description", {
+    //   cell: (info) => info.getValue(),
+    //   header: () => <span>Description</span>,
+    //   enableColumnFilter: false,
+    // }),
     columnHelper.accessor("level", {
       header: () => <span>Level</span>,
     }),
@@ -164,6 +173,7 @@ export const TimetableDataTable: React.FC<Props> = ({ data }) => {
   const table = useReactTable({
     data,
     columns,
+
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),

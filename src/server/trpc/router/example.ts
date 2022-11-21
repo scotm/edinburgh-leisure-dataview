@@ -40,16 +40,21 @@ export const exampleRouter = router({
       },
       where: {
         is_cancelled: false,
+        date_time: {
+          gte: new Date(),
+          lte: new Date(new Date().setDate(new Date().getDate() + 7)),
+        },
       },
     });
-    console.log(data.length);
     const newdata = data.map((item) => {
       return {
         name: item.name,
         description: stripHTML(
           item.session.description.replaceAll("&nbsp;", " ")
         ),
-        date_time: item.date_time,
+        date: item.date_time.toLocaleDateString(),
+        time: item.date_time.toLocaleTimeString(),
+        end_time: item.end_time.toLocaleTimeString(),
         instructor: item.instructor_name,
         site: {
           name: item.session.Timetable?.site.name,

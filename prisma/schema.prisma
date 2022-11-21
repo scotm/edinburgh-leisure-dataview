@@ -87,6 +87,7 @@ model TimetableEntry {
   id                   Int              @id @default(autoincrement())
   name                 String
   date_time            DateTime
+  end_time             DateTime
   facility_name        String
   is_cancelled         Boolean
   session              TimetableSession @relation(fields: [timetable_session_id], references: [timetablesession_id])

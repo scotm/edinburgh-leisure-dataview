@@ -8,7 +8,6 @@ const Home: NextPage = () => {
   if (isLoading || data === undefined) {
     return null;
   }
-  console.log(data);
   return (
     <>
       <Head>
