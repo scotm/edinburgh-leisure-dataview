@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Column,
   createColumnHelper,
@@ -9,16 +10,56 @@ import {
   Table,
   useReactTable,
 } from "@tanstack/react-table";
+import { StarIcon } from "@heroicons/react/24/solid";
 import React from "react";
 import { AppRouterTypes } from "../utils/trpc";
-
+import { Modal, ModalProps } from "./Modal";
 import { UnwrapArray } from "../utils/typescript";
 
-type Props = {
+type TableDataProps = {
   data: AppRouterTypes["example"]["alltimes"]["output"];
 };
 
-function Filter({
+function NumberFilter({
+  column,
+  columnFilterValue,
+}: {
+  column: Column<any, unknown>;
+  columnFilterValue: unknown;
+}) {
+  const minmax = column.getFacetedMinMaxValues();
+  return (
+    <div>
+      <div className="flex space-x-2">
+        <DebouncedInput
+          type="number"
+          min={Number(minmax?.[0] ?? "")}
+          max={Number(minmax?.[1] ?? "")}
+          value={(columnFilterValue as [number, number])?.[0] ?? ""}
+          onChange={(value) =>
+            column.setFilterValue((old: [number, number]) => [value, old?.[1]])
+          }
+          placeholder={`${minmax?.[0] ? `(${minmax?.[0]})` : ""}`}
+          className="w-16 rounded border shadow"
+        />
+        <DebouncedInput
+          type="number"
+          min={Number(minmax?.[0] ?? "")}
+          max={Number(minmax?.[1] ?? "")}
+          value={(columnFilterValue as [number, number])?.[1] ?? ""}
+          onChange={(value) =>
+            column.setFilterValue((old: [number, number]) => [old?.[0], value])
+          }
+          placeholder={`${minmax?.[1] ? `(${minmax?.[1]})` : ""}`}
+          className="w-16 rounded border shadow"
+        />
+      </div>
+      <div className="h-1" />
+    </div>
+  );
+}
+
+function CustomColumnFilter({
   column,
   table,
 }: {
@@ -40,41 +81,8 @@ function Filter({
     [facetedUniqueValues, firstValue]
   );
   if (typeof firstValue === "number") {
-    const minmax = column.getFacetedMinMaxValues();
     return (
-      <div>
-        <div className="flex space-x-2">
-          <DebouncedInput
-            type="number"
-            min={Number(minmax?.[0] ?? "")}
-            max={Number(minmax?.[1] ?? "")}
-            value={(columnFilterValue as [number, number])?.[0] ?? ""}
-            onChange={(value) =>
-              column.setFilterValue((old: [number, number]) => [
-                value,
-                old?.[1],
-              ])
-            }
-            placeholder={`Min ${minmax?.[0] ? `(${minmax?.[0]})` : ""}`}
-            className="w-16 rounded border shadow"
-          />
-          <DebouncedInput
-            type="number"
-            min={Number(minmax?.[0] ?? "")}
-            max={Number(minmax?.[1] ?? "")}
-            value={(columnFilterValue as [number, number])?.[1] ?? ""}
-            onChange={(value) =>
-              column.setFilterValue((old: [number, number]) => [
-                old?.[0],
-                value,
-              ])
-            }
-            placeholder={`Max ${minmax?.[1] ? `(${minmax?.[1]})` : ""}`}
-            className="w-16 rounded border shadow"
-          />
-        </div>
-        <div className="h-1" />
-      </div>
+      <NumberFilter column={column} columnFilterValue={columnFilterValue} />
     );
   } else {
     return (
@@ -132,12 +140,38 @@ function DebouncedInput({
   );
 }
 
-export const TimetableDataTable: React.FC<Props> = ({ data }) => {
-  const columnHelper = createColumnHelper<UnwrapArray<Props["data"]>>();
-  const columns = [
+export const TimetableDataTable: React.FC<TableDataProps> = ({ data }) => {
+  const columnHelper =
+    createColumnHelper<UnwrapArray<TableDataProps["data"]>>();
+  // eslint-disable-next-line prefer-const
+  let [showModal, setShowModal] = React.useState(false);
+  const [modalData, setModalData] = React.useState<
+    Omit<ModalProps, "setShowModal">
+  >({
+    body: data[0]?.description ?? "",
+    title: data[0]?.name ?? "",
+  });
+
+  const tableColumns = [
     columnHelper.accessor("name", {
       header: () => <span>Name</span>,
       filterFn: "includesString",
+      cell: (props) => (
+        <button
+          className="mr-1 mb-1 w-full rounded bg-indigo-500 px-6 py-3 text-sm font-bold uppercase text-white shadow outline-none transition-all duration-150 ease-linear hover:shadow-lg focus:outline-none active:bg-pink-600"
+          type="button"
+          onClick={() => {
+            showModal = true;
+            setShowModal(true);
+            setModalData({
+              body: props.row.original.description,
+              title: props.row.original.name,
+            });
+          }}
+        >
+          {props.row.original.name}
+        </button>
+      ),
     }),
     columnHelper.accessor("site.name", {
       header: () => <span>Where</span>,
@@ -161,18 +195,41 @@ export const TimetableDataTable: React.FC<Props> = ({ data }) => {
       header: () => <span>Time</span>,
       enableColumnFilter: false,
     }),
-    // columnHelper.accessor("description", {
-    //   cell: (info) => info.getValue(),
-    //   header: () => <span>Description</span>,
-    //   enableColumnFilter: false,
-    // }),
     columnHelper.accessor("level", {
-      header: () => <span>Level</span>,
+      header: () => <span>Intensity</span>,
+      cell: (info) => {
+        const level = info.getValue();
+        switch (level) {
+          case 1:
+            return (
+              <span className="text-green-500">
+                <StarIcon className="inline h-4 w-4" />
+              </span>
+            );
+          case 2:
+            return (
+              <span className="text-yellow-500">
+                <StarIcon className="inline h-4 w-4" />
+                <StarIcon className="inline h-4 w-4" />
+              </span>
+            );
+          case 3:
+            return (
+              <span className="text-red-500">
+                <StarIcon className="inline h-4 w-4" />
+                <StarIcon className="inline h-4 w-4" />
+                <StarIcon className="inline h-4 w-4" />
+              </span>
+            );
+          default:
+        }
+      },
     }),
   ];
+
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
 
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -181,61 +238,67 @@ export const TimetableDataTable: React.FC<Props> = ({ data }) => {
   });
 
   return (
-    <table className="table-auto">
-      <thead>
-        {table.getHeaderGroups().map((headerGroup) => (
-          <tr
-            className="border-b p-4 pl-8 pt-0 pb-3 text-left font-medium"
-            key={headerGroup.id}
-          >
-            {headerGroup.headers.map((header) => (
-              <th
-                className="border-b p-4 pl-8 pt-0 pb-3 text-left"
-                key={header.id}
-              >
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-                {header.column.getCanFilter() ? (
-                  <div>
-                    <Filter column={header.column} table={table} />
-                  </div>
-                ) : null}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody>
-        {table.getRowModel().rows.map((row) => (
-          <tr className="border-b p-4 pl-8 pt-0 pb-3 text-left" key={row.id}>
-            {row.getVisibleCells().map((cell) => (
-              <td className="border-b p-4 pl-8" key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-      <tfoot>
-        {table.getFooterGroups().map((footerGroup) => (
-          <tr key={footerGroup.id}>
-            {footerGroup.headers.map((header) => (
-              <th key={header.id}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.footer,
-                      header.getContext()
-                    )}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </tfoot>
-    </table>
+    <>
+      <table className="table-auto">
+        <thead>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr
+              className="border-b p-4 pl-8 pt-0 pb-3 text-left font-medium"
+              key={headerGroup.id}
+            >
+              {headerGroup.headers.map((header) => (
+                <th
+                  className="border-b p-4 pl-8 pt-0 pb-3 text-left"
+                  key={header.id}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                  {header.column.getCanFilter() ? (
+                    <div>
+                      <CustomColumnFilter
+                        column={header.column}
+                        table={table}
+                      />
+                    </div>
+                  ) : null}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row) => (
+            <tr className="border-b p-4 pl-8 pt-0 pb-3 text-left" key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <td className="border-b p-4 pl-8" key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          {table.getFooterGroups().map((footerGroup) => (
+            <tr key={footerGroup.id}>
+              {footerGroup.headers.map((header) => (
+                <th key={header.id}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.footer,
+                        header.getContext()
+                      )}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </tfoot>
+      </table>
+      {showModal && <Modal {...modalData} setShowModal={setShowModal} />}
+    </>
   );
 };

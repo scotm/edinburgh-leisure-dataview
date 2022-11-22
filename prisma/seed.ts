@@ -228,7 +228,7 @@ async function main() {
               name: entry.timetable_session.name,
               instructor_name: entry.instructor?.display_name ?? "",
               level: entry.level
-                ? entry.level.name.match("&#x1F9E1")?.length ?? 2
+                ? entry.level.name.match(/\&#x1F9E1/g)?.length ?? 2
                 : 2,
               is_cancelled: entry.is_cancelled,
               facility: {
