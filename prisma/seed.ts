@@ -20,14 +20,6 @@ const seven_days_later = new Date(Date.now() + 3600 * 1000 * 24 * 7)
   .toISOString()
   .split("T")[0];
 
-function getDeepObject(obj: unknown) {
-  return util.inspect(obj, {
-    showHidden: false,
-    depth: null,
-    colors: true,
-  });
-}
-
 // https://stackoverflow.com/questions/10011011/reading-a-local-json-file-in-node-js
 async function readJSONFromFile(filename: string) {
   try {
