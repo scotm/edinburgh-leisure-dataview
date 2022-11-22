@@ -50,7 +50,7 @@ model SiteFacilityType {
 
 model SiteFacility {
   id               Int              @id @default(autoincrement())
-  facility_id      Int              @unique
+  facility_id      String           @unique
   name             String
   tldc_approved    Boolean?
   length           Float?
@@ -93,7 +93,7 @@ model TimetableEntry {
   session              TimetableSession @relation(fields: [timetable_session_id], references: [timetablesession_id])
   timetable_session_id Int
   facility             SiteFacility     @relation(fields: [facility_id], references: [facility_id])
-  facility_id          Int
+  facility_id          String
   instructor_name      String
   level                Int
 }

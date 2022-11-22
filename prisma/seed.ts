@@ -10,10 +10,23 @@ import {
   timetableValidator,
 } from "../src/utils/validators";
 
+import util from "util";
+
 const prisma = new PrismaClient();
 const debug = true;
 
 const key = process.env.ACTIVEINTIME_KEY;
+const seven_days_later = new Date(Date.now() + 3600 * 1000 * 24 * 7)
+  .toISOString()
+  .split("T")[0];
+
+function getDeepObject(obj: unknown) {
+  return util.inspect(obj, {
+    showHidden: false,
+    depth: null,
+    colors: true,
+  });
+}
 
 // https://stackoverflow.com/questions/10011011/reading-a-local-json-file-in-node-js
 async function readJSONFromFile(filename: string) {
@@ -49,19 +62,19 @@ async function getDataFromAPI(url: string) {
 }
 
 // Creates an inverted lookup map
-function getInverse(lookupMap: Map<number, Array<number>>) {
-  const inverse = new Map<number, number>();
-  lookupMap.forEach((value, key) => {
-    value.forEach((v) => {
-      inverse.set(v, key);
-    });
-  });
-  return inverse;
-}
+// function getInverse(lookupMap: Map<number, Array<number>>) {
+//   const inverse = new Map<number, number>();
+//   lookupMap.forEach((value, key) => {
+//     value.forEach((v) => {
+//       inverse.set(v, key);
+//     });
+//   });
+//   return inverse;
+// }
 
 // Keeping these in file scope. They are used in multiple functions
 const siteTimetablesMap = new Map<number, Array<number>>();
-const facilities_seen = new Set<number>();
+// const facilities_seen = new Set<number>();
 
 async function main() {
   await Promise.all(
@@ -77,32 +90,7 @@ async function main() {
         siteValidator.parse(response)
       );
 
-      // Create the SiteFacility objects
-      const facilities = confirmedSites
-        .flatMap((site) => site.facilities)
-        .filter((facility) => {
-          if (facilities_seen.has(facility.id)) {
-            return false;
-          } else {
-            facilities_seen.add(facility.id);
-            return true;
-          }
-        });
-
-      await Promise.all(
-        facilities.map(async (facility) => {
-          await prisma.siteFacility.create({
-            data: {
-              name: facility.primary_name,
-              length: facility.length,
-              facility_id: facility.id,
-              tldc_approved: facility.tldc_approved,
-            },
-          });
-        })
-      );
-
-      await Promise.all(
+      return await Promise.all(
         confirmedSites.map(async (site) => {
           siteTimetablesMap.set(
             site.id,
@@ -115,8 +103,11 @@ async function main() {
               timezone: site.timezone ?? "Europe/London",
               tldc_approved: site.tldc_approved,
               facilities: {
-                connect: site.facilities.map((facility) => ({
-                  facility_id: facility.id,
+                create: site.facilities.map((facility) => ({
+                  name: facility.primary_name,
+                  length: facility.length,
+                  facility_id: `${facility.id}_${site.id}`,
+                  tldc_approved: facility.tldc_approved,
                 })),
               },
               contact: {
@@ -137,112 +128,139 @@ async function main() {
         })
       );
     })
-    .then(async () => {
-      // Get a really big list of all the timetable ids
-      const timetable_ids = Array.from(siteTimetablesMap.values()).flat();
+    .then(async (sites) => {
+      return await Promise.all(
+        sites.map(async (site) => {
+          const timetable_ids = siteTimetablesMap.get(site.site_id);
+          if (timetable_ids === undefined) {
+            throw new Error("Site not found in siteTimetablesMap");
+          }
+          return {
+            site_id: site.site_id,
+            timetables: await Promise.all(
+              timetable_ids.map((timetable_id) =>
+                getDataFromAPI(
+                  `https://api.activeintime.com/v1/timetables/${timetable_id}.json?key=${key}`
+                )
+              )
+            ).then((responses) =>
+              responses.map((response) => timetableValidator.parse(response))
+            ),
+          };
+        })
+      );
+    })
+    .then(async (sites_and_timetables) => {
+      // console.log(getDeepObject(sites_and_timetables));
 
-      await Promise.all(
-        timetable_ids.map((timetable) =>
-          getDataFromAPI(
-            `https://api.activeintime.com/v1/timetables/${timetable}.json?key=${key}`
-          )
-        )
-      ).then(async (timetables) => {
-        const alreadyseen = new Set<number>();
-        const verified_timetables = timetables.map((timetable) =>
-          timetableValidator.parse(timetable)
-        );
-        const timetable_sessions: Array<TimetableSession> = [];
-        verified_timetables.forEach((timetable) => {
-          timetable.timetable_sessions.forEach((session) => {
-            if (!alreadyseen.has(session.id)) {
-              alreadyseen.add(session.id);
-              timetable_sessions.push(session);
+      // deduplicate and flatten the timetable sessions
+      const alreadyseen = new Set<number>();
+      const timetable_sessions: Array<TimetableSession> = [];
+
+      sites_and_timetables.forEach((site_and_timetable) => {
+        site_and_timetable.timetables.forEach((timetable) => {
+          timetable.timetable_sessions.forEach((timetable_session) => {
+            if (!alreadyseen.has(timetable_session.id)) {
+              alreadyseen.add(timetable_session.id);
+              timetable_sessions.push(timetable_session);
             }
           });
         });
+      });
 
-        // Add the timetable sessions to the database
-        for (const session of timetable_sessions) {
-          await prisma.timetableSession.create({
+      // insert the timetable sessions
+      for (const session of timetable_sessions) {
+        await prisma.timetableSession.create({
+          data: {
+            timetablesession_id: session.id,
+            name: session.name,
+            category: session.timetable_session_category.name,
+            description: session.description,
+          },
+        });
+      }
+      // Insert the timetables - and link up to the sessions
+      sites_and_timetables.forEach(async (site_and_timetable) => {
+        const site_id = site_and_timetable.site_id;
+        site_and_timetable.timetables.forEach(async (timetable) => {
+          await prisma.timetable.create({
             data: {
-              timetablesession_id: session.id,
-              name: session.name,
-              category: session.timetable_session_category.name,
-              description: session.description,
-            },
-          });
-        }
-
-        const timetable_data = verified_timetables.map((timetable) => {
-          const site_id = getInverse(siteTimetablesMap).get(timetable.id);
-          return {
-            timetable_id: timetable.id,
-            name: timetable.name,
-            site: {
-              connect: {
-                site_id: site_id,
+              timetable_id: timetable.id,
+              name: timetable.name,
+              site: {
+                connect: {
+                  site_id: site_id,
+                },
+              },
+              sessions: {
+                connect: timetable.timetable_sessions.map((session) => ({
+                  timetablesession_id: session.id,
+                })),
               },
             },
-            sessions: {
-              connect: timetable.timetable_sessions.map((session) => ({
-                timetablesession_id: session.id,
-              })),
-            },
-          };
-        });
-        timetable_data.forEach(async (d) => {
-          await prisma.timetable.create({
-            data: d,
           });
         });
       });
-      await Promise.all(
-        timetable_ids
-          .map((timetable) => {
-            const seven_days_later = new Date(Date.now() + 3600 * 1000 * 24 * 7)
-              .toISOString()
-              .split("T")[0];
-            return [
-              getDataFromAPI(
-                `https://api.activeintime.com/v1/timetables/${timetable}/timetable_entries.json?numberOfDays=7&key=${key}`
+      return sites_and_timetables;
+    })
+    .then(async (sites_and_timetables) => {
+      // Get the timetable sessions - and keep the site_id
+      const site_and_timetable_sessions = await Promise.all(
+        sites_and_timetables.map((site_and_timetable) =>
+          Promise.all(
+            site_and_timetable.timetables.map(async (timetable) => ({
+              site: site_and_timetable.site_id,
+              timetable_sessions: await Promise.all([
+                getDataFromAPI(
+                  `https://api.activeintime.com/v1/timetables/${timetable.id}/timetable_entries.json?numberOfDays=7&key=${key}`
+                ),
+                getDataFromAPI(
+                  `https://api.activeintime.com/v1/timetables/${timetable.id}/timetable_entries.json?numberOfDays=7&fromDate=${seven_days_later}&key=${key}`
+                ),
+              ]).then((responses) =>
+                responses.flatMap((response) =>
+                  timetableEntryValidator.parse(response)
+                )
               ),
-              getDataFromAPI(
-                `https://api.activeintime.com/v1/timetables/${timetable}/timetable_entries.json?numberOfDays=7&fromDate=${seven_days_later}&key=${key}`
-              ),
-            ];
-          })
-          .flat()
-      ).then((timetable_entries) => {
-        const verified_entries = timetable_entries
-          .map((entry) => timetableEntryValidator.parse(entry))
-          .flat();
+            }))
+          )
+        )
+      ).then((results) => results.flat());
 
-        verified_entries.forEach(async (entry) => {
-          await prisma.timetableEntry.create({
-            data: {
-              date_time: new Date(entry.date + "T" + entry.start_time),
-              end_time: new Date(entry.date + "T" + entry.end_time),
-              facility_name: entry.facility_name,
-              name: entry.timetable_session.name,
-              instructor_name: entry.instructor?.display_name ?? "",
-              level: entry.level
-                ? entry.level.name.match(/\&#x1F9E1/g)?.length ?? 2
-                : 2,
-              is_cancelled: entry.is_cancelled,
-              facility: {
-                connect: {
-                  facility_id: entry.facility.id,
+      return site_and_timetable_sessions;
+    })
+    .then((site_and_timetable_sessions) => {
+      // Insert the timetable sessions
+      site_and_timetable_sessions.forEach((site_and_timetable_session) => {
+        const site_id = site_and_timetable_session.site;
+
+        Promise.all(
+          site_and_timetable_session.timetable_sessions.map(async (entry) => {
+            await prisma.timetableEntry.create({
+              data: {
+                date_time: new Date(entry.date + "T" + entry.start_time),
+                end_time: new Date(entry.date + "T" + entry.end_time),
+                facility_name: entry.facility_name,
+                name: entry.timetable_session.name,
+                instructor_name: entry.instructor?.display_name ?? "",
+                level: entry.level
+                  ? entry.level.name.match(/\&#x1F9E1/g)?.length ?? 2
+                  : 2,
+                is_cancelled: entry.is_cancelled,
+                facility: {
+                  connect: {
+                    facility_id: `${entry.facility.id}_${site_id}`,
+                  },
+                },
+                session: {
+                  connect: {
+                    timetablesession_id: entry.timetable_session.id,
+                  },
                 },
               },
-              session: {
-                connect: {
-                  timetablesession_id: entry.timetable_session.id,
-                },
-              },
-            },
-          });
-        });
+            });
+          })
+        );
       });
     });
 }
