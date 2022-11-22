@@ -12,9 +12,8 @@ import {
 
 const prisma = new PrismaClient();
 const debug = true;
-const sites = minimalsites;
 
-const key = "D8lafTKUXBelUzs2s33bTGU3j7MBfOEtNKn1bAoX";
+const key = process.env.ACTIVEINTIME_KEY;
 
 // https://stackoverflow.com/questions/10011011/reading-a-local-json-file-in-node-js
 async function readJSONFromFile(filename: string) {
@@ -66,7 +65,7 @@ const facilities_seen = new Set<number>();
 
 async function main() {
   await Promise.all(
-    sites.map((site) =>
+    minimalsites.map((site) =>
       getDataFromAPI(
         `https://api.activeintime.com/v1/sites/${site.id}.json?key=${key}`
       )
