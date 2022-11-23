@@ -69,13 +69,13 @@ const timetableSessionValidator = z.object({
 export const timetableValidator = z.object({
   id: z.number(),
   name: z.string(),
-  instructors: z.array(
+  instructors: z.optional(z.array(
     z.object({
       first_name: z.string(),
       last_name: z.string(),
       display_name: z.string(),
     })
-  ),
+  )),
   timetable_sessions: z.array(timetableSessionValidator),
   facilities: z.array(facilitiesValidator),
   levels: z.array(

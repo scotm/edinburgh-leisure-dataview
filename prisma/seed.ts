@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
 import { readFile, writeFile } from "fs/promises";
+import { existsSync, mkdirSync } from "fs"
 import { Md5 as md5 } from "ts-md5";
 import { sites } from "../src/utils/constants";
 import {
@@ -49,7 +50,11 @@ async function writeJSON(filename: string, data: unknown) {
 // A basic function to return the results of an API call, and cache it for later
 async function getDataFromAPI(url: string) {
   const digest = md5.hashStr(url);
-  const filename = `${__dirname}/data/${digest}.json`;
+  const dir = `${__dirname}/data`;
+  if (!existsSync(dir)) {
+    mkdirSync(dir);
+  }
+  const filename = `${dir}/${digest}.json`;
   let result = await readJSONFromFile(filename);
 
   if (result === undefined) {
@@ -107,13 +112,16 @@ async function main() {
 
   const timetablesMap = new Map<number, Timetable>();
   for (const site of confirmedSites) {
-    for (const timetable of site.timetables) {
+    await Promise.all(site.timetables.map(async (timetable)=>{
       const url = `https://api.activeintime.com/v1/timetables/${timetable.id}.json?key=${key}`;
-      const confirmedTimetable = await getDataFromAPI(url).then((data) =>
-        timetableValidator.parse(data)
-      );
+      const confirmedTimetable = await getDataFromAPI(url)
+        .then((data) => timetableValidator.parse(data))
+        .catch((reason) => {
+          console.log(`failed url: ${url}`);
+          throw reason;
+        });
       timetablesMap.set(timetable.id, confirmedTimetable);
-    }
+    }))
   }
 
   const timetablesessions = Array.from(timetablesMap.entries())
