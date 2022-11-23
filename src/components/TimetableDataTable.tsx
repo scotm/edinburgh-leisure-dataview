@@ -17,7 +17,7 @@ import { Modal, ModalProps } from "./Modal";
 import { UnwrapArray } from "../utils/typescript";
 
 type TableDataProps = {
-  data: AppRouterTypes["example"]["alltimes"]["output"];
+  data: AppRouterTypes["example"]["simplerTimes"]["output"];
 };
 
 function NumberFilter({
@@ -96,8 +96,8 @@ function CustomColumnFilter({
           type="text"
           value={(columnFilterValue ?? "") as string}
           onChange={(value) => column.setFilterValue(value)}
-          placeholder={`Search... (${facetedUniqueValues.size})`}
-          className="w-36 rounded border shadow"
+          placeholder={`Search (${facetedUniqueValues.size})`}
+          className="w-full rounded border shadow"
           list={column.id + "list"}
         />
         <div className="h-1" />
@@ -110,7 +110,7 @@ function CustomColumnFilter({
 function DebouncedInput({
   value: initialValue,
   onChange,
-  debounce = 500,
+  debounce = 300,
   ...props
 }: {
   value: string | number;
@@ -173,13 +173,11 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({ data }) => {
         </button>
       ),
     }),
-    columnHelper.accessor("site.name", {
+    columnHelper.accessor("site_name", {
       header: () => <span>Where</span>,
-      filterFn: "includesString",
     }),
-    columnHelper.accessor("site.facility_name", {
+    columnHelper.accessor("site_facility", {
       header: () => <span>Facilty</span>,
-      filterFn: "includesString",
     }),
     columnHelper.accessor("date", {
       cell: (info) => info.getValue(),
@@ -187,12 +185,12 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({ data }) => {
     }),
     columnHelper.accessor("time", {
       cell: (info) => info.getValue(),
-      header: () => <span>Time</span>,
+      header: () => <span>Start</span>,
       enableColumnFilter: false,
     }),
     columnHelper.accessor("end_time", {
       cell: (info) => info.getValue(),
-      header: () => <span>Time</span>,
+      header: () => <span>Finish</span>,
       enableColumnFilter: false,
     }),
     columnHelper.accessor("level", {
@@ -239,6 +237,9 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({ data }) => {
 
   return (
     <>
+      <h3 className="my-2 text-2xl">
+        Number of rows: {table.getPrePaginationRowModel().rows.length}
+      </h3>
       <table className="table-auto">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (

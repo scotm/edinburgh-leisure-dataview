@@ -10,12 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Example {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model SiteContact {
   id             Int     @id @default(autoincrement())
   address_line_1 String
@@ -49,16 +43,15 @@ model SiteFacilityType {
 }
 
 model SiteFacility {
-  id               Int              @id @default(autoincrement())
-  facility_id      String           @unique
+  id               Int      @id @default(autoincrement())
+  facility_id      String   @unique
   name             String
   tldc_approved    Boolean?
   length           Float?
   primary_name     String?
   no_of_timetables Int?
-  site             Site?            @relation(fields: [siteId], references: [site_id])
+  site             Site?    @relation(fields: [siteId], references: [site_id])
   siteId           Int?
-  TimetableEntry   TimetableEntry[]
 }
 
 model Timetable {
@@ -72,7 +65,7 @@ model Timetable {
 
 model TimetableSession {
   id                  Int              @id @default(autoincrement())
-  timetablesession_id Int              @unique
+  timetablesession_id String           @unique
   name                String
   description         String
   category            String
@@ -91,9 +84,18 @@ model TimetableEntry {
   facility_name        String
   is_cancelled         Boolean
   session              TimetableSession @relation(fields: [timetable_session_id], references: [timetablesession_id])
-  timetable_session_id Int
-  facility             SiteFacility     @relation(fields: [facility_id], references: [facility_id])
-  facility_id          String
+  timetable_session_id String
   instructor_name      String
   level                Int
+}
+
+model AllEvents {
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String
+  date          DateTime
+  end_time      DateTime
+  site_name     String
+  site_facility String
+  level         Int
 }

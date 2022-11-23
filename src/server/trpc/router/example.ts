@@ -1,30 +1,40 @@
 import { router, publicProcedure } from "../trpc";
-import { z } from "zod";
 import { sites } from "../../../utils/constants";
-
-// Strip out HTML from a string
-function stripHTML(html: string) {
-  return html.replace(/(<([^>]+)>)/gi, "");
-}
+import { stripHTML } from "../../../utils/functions";
 
 export const exampleRouter = router({
-  hello: publicProcedure
-    .input(z.object({ text: z.string().nullish() }).nullish())
-    .query(({ input }) => {
-      return {
-        greeting: `Hello ${input?.text ?? "world"}`,
-      };
-    }),
-  getAll: publicProcedure.query(({ ctx }) => {
-    return ctx.prisma.example.findMany();
-  }),
   basicsites: publicProcedure.query(() => {
     return sites;
   }),
+  simplerTimes: publicProcedure.query(async ({ ctx }) =>
+    ctx.prisma.allEvents
+      .findMany({
+        orderBy: { date: "asc" },
+        where: {
+          date: {
+            gte: new Date(),
+            lte: new Date(new Date().setDate(new Date().getDate() + 7)),
+          },
+        },
+      })
+      .then((data) =>
+        data.map((item) => {
+          return {
+            name: item.name,
+            description: item.description,
+            date: item.date.toLocaleDateString(),
+            time: item.date.toLocaleTimeString(),
+            end_time: item.end_time.toLocaleTimeString(),
+            site_name: item.site_name,
+            site_facility: item.site_facility,
+            level: item.level,
+          };
+        })
+      )
+  ),
   alltimes: publicProcedure.query(async ({ ctx }) => {
     const data = await ctx.prisma.timetableEntry.findMany({
       include: {
-        facility: true,
         session: {
           include: {
             Timetable: {
@@ -44,25 +54,43 @@ export const exampleRouter = router({
           gte: new Date(),
           lte: new Date(new Date().setDate(new Date().getDate() + 7)),
         },
+        NOT: {
+          OR: [
+            {
+              name: {
+                contains: "Swimming",
+              },
+            },
+            {
+              name: {
+                contains: "Closed",
+              },
+            },
+          ],
+        },
       },
     });
-    const newdata = data.map((item) => {
-      return {
-        name: item.name,
-        description: stripHTML(
-          item.session.description.replaceAll("&nbsp;", " ")
-        ),
-        date: item.date_time.toLocaleDateString(),
-        time: item.date_time.toLocaleTimeString(),
-        end_time: item.end_time.toLocaleTimeString(),
-        instructor: item.instructor_name,
-        site: {
-          name: item.session.Timetable?.site.name,
-          facility_name: item.facility.name,
-        },
-        level: item.level,
-      };
-    });
+    const newdata = data
+      .filter(
+        (entry) =>
+          entry.end_time.getTime() - entry.date_time.getTime() <= 3600 * 1000 // 1 hour
+      )
+      .map((entry) => {
+        return {
+          name: entry.name,
+          description: stripHTML(
+            entry.session.description.replaceAll("&nbsp;", " ")
+          ),
+          date: entry.date_time.toLocaleDateString(),
+          time: entry.date_time.toLocaleTimeString(),
+          end_time: entry.end_time.toLocaleTimeString(),
+          site: {
+            name: entry.session.Timetable?.site.name,
+            facility: entry.facility_name,
+          },
+          level: entry.level,
+        };
+      });
 
     return newdata;
   }),
