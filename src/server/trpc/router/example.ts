@@ -13,14 +13,13 @@ export const exampleRouter = router({
         where: {
           date: {
             gte: new Date(),
-            lte: new Date(new Date().setDate(new Date().getDate() + 7)),
           },
         },
       })
       .then((data) =>
         data.map((item) => {
           return {
-            name: item.name,
+            event_name: item.name,
             description: item.description,
             date: item.date.toLocaleDateString(),
             time: item.date.toLocaleTimeString(),
