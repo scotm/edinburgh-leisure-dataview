@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Column,
@@ -13,12 +14,8 @@ import {
 import { StarIcon } from "@heroicons/react/24/solid";
 import React from "react";
 import { AppRouterTypes } from "../utils/trpc";
-import { Modal, ModalProps } from "./Modal";
 import { UnwrapArray } from "../utils/typescript";
-
-type TableDataProps = {
-  data: AppRouterTypes["example"]["simplerTimes"]["output"];
-};
+import { ModalProps } from "./Modal";
 
 function NumberFilter({
   column,
@@ -73,13 +70,16 @@ function CustomColumnFilter({
   const columnFilterValue = column.getFilterValue();
   const facetedUniqueValues = column.getFacetedUniqueValues();
 
-  const sortedUniqueValues = React.useMemo(
-    () =>
-      typeof firstValue === "number"
-        ? []
-        : Array.from(facetedUniqueValues.keys()).sort(),
-    [facetedUniqueValues, firstValue]
-  );
+  const sortedUniqueValues = React.useMemo(() => {
+    if (typeof firstValue === "number") {
+      return []
+    } else if (typeof firstValue === "string") {
+      return Array.from(facetedUniqueValues.keys()).sort();
+    }
+    return typeof firstValue === "number"
+      ? []
+      : Array.from(facetedUniqueValues.keys()).sort();
+  }, [facetedUniqueValues]);
   if (typeof firstValue === "number") {
     return (
       <NumberFilter column={column} columnFilterValue={columnFilterValue} />
@@ -89,7 +89,7 @@ function CustomColumnFilter({
       <>
         <datalist id={column.id + "list"}>
           {sortedUniqueValues.slice(0, 5000).map((value: any) => (
-            <option value={value} key={value} />
+            <option value={value} key={value}>{facetedUniqueValues.get(value)}</option>
           ))}
         </datalist>
         <DebouncedInput
@@ -110,7 +110,7 @@ function CustomColumnFilter({
 function DebouncedInput({
   value: initialValue,
   onChange,
-  debounce = 300,
+  debounce = 250,
   ...props
 }: {
   value: string | number;
@@ -129,7 +129,7 @@ function DebouncedInput({
     }, debounce);
 
     return () => clearTimeout(timeout);
-  }, [value, debounce, onChange]);
+  }, [value]);
 
   return (
     <input
@@ -140,36 +140,38 @@ function DebouncedInput({
   );
 }
 
-export const TimetableDataTable: React.FC<TableDataProps> = ({ data }) => {
+type TableDataProps = {
+  data: AppRouterTypes["example"]["simplerTimes"]["output"];
+  setShowModal: (showModal: boolean) => void;
+  setModalData: (setModalData: Omit<ModalProps, "setShowModal">) => void;
+};
+
+export const TimetableDataTable: React.FC<TableDataProps> = ({
+  data,
+  setModalData,
+  setShowModal,
+}) => {
   const columnHelper =
     createColumnHelper<UnwrapArray<TableDataProps["data"]>>();
-  // eslint-disable-next-line prefer-const
-  let [showModal, setShowModal] = React.useState(false);
-  const [modalData, setModalData] = React.useState<
-    Omit<ModalProps, "setShowModal">
-  >({
-    body: data[0]?.description ?? "",
-    title: data[0]?.name ?? "",
-  });
 
   const tableColumns = [
-    columnHelper.accessor("name", {
-      header: () => <span>Name</span>,
+    columnHelper.accessor("event_name", {
+      header: () => <span>Event</span>,
       filterFn: "includesString",
+      // enableColumnFilter: false,
       cell: (props) => (
         <button
           className="mr-1 mb-1 w-full rounded bg-indigo-500 px-6 py-3 text-sm font-bold uppercase text-white shadow outline-none transition-all duration-150 ease-linear hover:shadow-lg focus:outline-none active:bg-pink-600"
           type="button"
           onClick={() => {
-            showModal = true;
             setShowModal(true);
             setModalData({
               body: props.row.original.description,
-              title: props.row.original.name,
+              title: props.row.original.event_name,
             });
           }}
         >
-          {props.row.original.name}
+          {props.row.original.event_name}
         </button>
       ),
     }),
@@ -299,7 +301,6 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({ data }) => {
           ))}
         </tfoot>
       </table>
-      {showModal && <Modal {...modalData} setShowModal={setShowModal} />}
     </>
   );
 };

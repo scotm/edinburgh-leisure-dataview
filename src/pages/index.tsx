@@ -1,5 +1,7 @@
 import type { NextPage } from "next";
 import Head from "next/head";
+import React from "react";
+import { Modal, ModalProps } from "../components/Modal";
 import { TimetableDataTable } from "../components/TimetableDataTable";
 import { trpc } from "../utils/trpc";
 
@@ -7,6 +9,14 @@ const Home: NextPage = () => {
   const { data, isLoading } = trpc.example.simplerTimes.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
+    // eslint-disable-next-line prefer-const
+    let [showModal, setShowModal] = React.useState(false);
+    const [modalData, setModalData] = React.useState<
+      Omit<ModalProps, "setShowModal">
+    >({
+      body: "",
+      title: "",
+    });
   if (isLoading || data === undefined) {
     return null;
   }
@@ -20,8 +30,9 @@ const Home: NextPage = () => {
 
       <main className="container mx-auto flex min-h-screen flex-col items-center p-4">
         <h1 className="my-4 text-4xl font-bold">Edinburgh Leisure Data View</h1>
-        <TimetableDataTable data={data} />
+        <TimetableDataTable data={data} setShowModal={setShowModal} setModalData={setModalData} />
       </main>
+      {showModal && <Modal {...modalData} setShowModal={setShowModal} />}
     </>
   );
 };
