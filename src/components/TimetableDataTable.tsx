@@ -72,7 +72,7 @@ function CustomColumnFilter({
 
   const sortedUniqueValues = React.useMemo(() => {
     if (typeof firstValue === "number") {
-      return []
+      return [];
     } else if (typeof firstValue === "string") {
       return Array.from(facetedUniqueValues.keys()).sort();
     }
@@ -89,7 +89,10 @@ function CustomColumnFilter({
       <>
         <datalist id={column.id + "list"}>
           {sortedUniqueValues.slice(0, 5000).map((value: any) => (
-            <option value={value} key={value}>{facetedUniqueValues.get(value)}</option>
+            <option value={value} key={value}>
+              {/* {`${value} (${facetedUniqueValues.get(value)})`} */}
+              {value}
+            </option>
           ))}
         </datalist>
         <DebouncedInput
@@ -166,7 +169,20 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({
           onClick={() => {
             setShowModal(true);
             setModalData({
-              body: props.row.original.description,
+              body: (
+                <>
+                  <h3 className="text-xl font-semibold">
+                    {props.row.original.site_name}
+                  </h3>
+                  <h3 className="text-l font-semibold">
+                    {props.row.original.site_facility}
+                  </h3>
+                  {props.row.original.instructor && (
+                    <p>{props.row.original.instructor}</p>
+                  )}
+                  <p className="my-2">{props.row.original.description}</p>
+                </>
+              ),
               title: props.row.original.event_name,
             });
           }}
@@ -186,26 +202,27 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({
       header: () => <span>Date</span>,
     }),
     columnHelper.accessor("time", {
-      cell: (info) => info.getValue(),
+      cell: (info) => info.getValue().split(":").slice(0, 2).join(":"),
       header: () => <span>Start</span>,
       enableColumnFilter: false,
     }),
     columnHelper.accessor("end_time", {
-      cell: (info) => info.getValue(),
+      cell: (info) => info.getValue().split(":").slice(0, 2).join(":"),
       header: () => <span>Finish</span>,
       enableColumnFilter: false,
     }),
+    // columnHelper.accessor("instructor", {
+    //   cell: (info) => info.getValue(),
+    //   header: () => <span>Instructor</span>,
+    //   enableColumnFilter: false,
+    // }),
     columnHelper.accessor("level", {
       header: () => <span>Intensity</span>,
       cell: (info) => {
         const level = info.getValue();
         switch (level) {
           case 1:
-            return (
-              <span className="text-green-500">
-                <StarIcon className="inline h-4 w-4" />
-              </span>
-            );
+            return <StarIcon className="inline h-4 w-4 text-green-500" />;
           case 2:
             return (
               <span className="text-yellow-500">
@@ -227,9 +244,31 @@ export const TimetableDataTable: React.FC<TableDataProps> = ({
     }),
   ];
 
+  function defaultDate() {
+    const today = new Date().toLocaleDateString().split("T")[0];
+    const todays_events = data.filter((item) => item.date === today);
+    if (todays_events.length) {
+      console.log(todays_events);
+      return today;
+    } else
+      return new Date(Date.now() + 3600 * 1000 * 24 * 1)
+        .toLocaleDateString()
+        .split("T")[0];
+  }
+
   const table = useReactTable({
     data,
     columns: tableColumns,
+
+    // Only show today, or the next's days events
+    initialState: {
+      columnFilters: [
+        {
+          id: "date",
+          value: defaultDate(),
+        },
+      ],
+    },
 
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

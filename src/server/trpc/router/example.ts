@@ -27,6 +27,7 @@ export const exampleRouter = router({
             site_name: item.site_name,
             site_facility: item.site_facility,
             level: item.level,
+            instructor: item.instructor,
           };
         })
       )
@@ -88,6 +89,7 @@ export const exampleRouter = router({
             facility: entry.facility_name,
           },
           level: entry.level,
+          instructor: entry.instructor_name,
         };
       });
 

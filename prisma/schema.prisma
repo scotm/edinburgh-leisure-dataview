@@ -97,5 +97,6 @@ model AllEvents {
   end_time      DateTime
   site_name     String
   site_facility String
+  instructor    String
   level         Int
 }
