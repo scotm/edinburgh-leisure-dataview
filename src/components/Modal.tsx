@@ -11,9 +11,6 @@ export const Modal: FC<ModalProps> = ({ setShowModal, body, title }) => {
     <>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden outline-none focus:outline-none"
-        onClickCapture={() => {
-          setShowModal(false);
-        }}
       >
         <div className="relative my-6 mx-auto w-auto max-w-3xl">
           <div className="relative flex w-full flex-col rounded-lg border-0 bg-white shadow-lg outline-none focus:outline-none">
