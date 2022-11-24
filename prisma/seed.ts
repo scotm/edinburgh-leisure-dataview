@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
-import { readFile, writeFile } from "fs/promises";
-import { existsSync, mkdirSync } from "fs"
+import { readFile, unlink, writeFile } from "fs/promises";
+import { existsSync, mkdirSync } from "fs";
 import { Md5 as md5 } from "ts-md5";
 import { sites } from "../src/utils/constants";
 import {
@@ -27,14 +27,13 @@ async function readJSONFromFile(filename: string) {
   try {
     const result = JSON.parse(await readFile(filename, "utf-8"));
     return result;
-  } catch (e) {
-    console.log(typeof e);
-    // if (e instanceof Error && e.code !== "ENOENT") {
-    console.log(e);
-    // await unlink(filename).catch((e) => {
-    //   console.log(e);
-    // });
-    // }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (e: any) {
+    if (e.code !== undefined && e.code !== "ENOENT") {
+      await unlink(filename).catch((e) => {
+        console.log(e);
+      });
+    }
   }
   return undefined;
 }
@@ -58,7 +57,7 @@ async function getDataFromAPI(url: string) {
   let result = await readJSONFromFile(filename);
 
   if (result === undefined) {
-    if (debug) console.log(url);
+    if (debug) console.log(`Fetching and caching ${url}`);
     result = await axios.get(url).then((response) => response.data.response);
     await writeJSON(filename, result);
   }
@@ -112,16 +111,18 @@ async function main() {
 
   const timetablesMap = new Map<number, Timetable>();
   for (const site of confirmedSites) {
-    await Promise.all(site.timetables.map(async (timetable)=>{
-      const url = `https://api.activeintime.com/v1/timetables/${timetable.id}.json?key=${key}`;
-      const confirmedTimetable = await getDataFromAPI(url)
-        .then((data) => timetableValidator.parse(data))
-        .catch((reason) => {
-          console.log(`failed url: ${url}`);
-          throw reason;
-        });
-      timetablesMap.set(timetable.id, confirmedTimetable);
-    }))
+    await Promise.all(
+      site.timetables.map(async (timetable) => {
+        const url = `https://api.activeintime.com/v1/timetables/${timetable.id}.json?key=${key}`;
+        const confirmedTimetable = await getDataFromAPI(url)
+          .then((data) => timetableValidator.parse(data))
+          .catch((reason) => {
+            console.log(`failed url: ${url}`);
+            throw reason;
+          });
+        timetablesMap.set(timetable.id, confirmedTimetable);
+      })
+    );
   }
 
   const timetablesessions = Array.from(timetablesMap.entries())
