@@ -41,3 +41,5 @@ yarn-error.log*
 
 prisma/data
 prisma/testing_data.ts
+
+.idea
