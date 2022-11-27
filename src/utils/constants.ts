@@ -1,6 +1,6 @@
 export const sites = [
   { id: 5205, name: "Ainslie Park Leisure Centre" },
-  { id: 106985, name: "Balerno High School" },
+  // { id: 106985, name: "Balerno High School" },
   { id: 5216, name: "Craiglockhart Leisure and Tennis Centre" },
   { id: 5221, name: "Dalry Swim Centre" },
   { id: 5945, name: "Drumbrae Leisure Centre" },
@@ -12,9 +12,9 @@ export const sites = [
   { id: 5239, name: "Leith Victoria Swim Centre" },
   { id: 106984, name: "Meadowbank Sports Centre" },
   { id: 5956, name: "Portobello Swim Centre" },
-  { id: 5258, name: "Queensferry High School" },
+  // { id: 5258, name: "Queensferry High School" },
   { id: 5260, name: "Royal Commonwealth Pool" },
-  { id: 107014, name: "Trinity Academy" },
+  // { id: 107014, name: "Trinity Academy" },
   { id: 5962, name: "Warrender Swim Centre" },
-  { id: 107007, name: "Wester Hailes High School" },
+  // { id: 107007, name: "Wester Hailes High School" },
 ];

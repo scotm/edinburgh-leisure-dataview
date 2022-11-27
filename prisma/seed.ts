@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { readFile, unlink, writeFile } from "fs/promises";
 import { existsSync, mkdirSync } from "fs";
-import { Md5 as md5 } from "ts-md5";
+import { readFile, unlink, writeFile } from "fs/promises";
+import { Md5 } from "ts-md5";
 import { sites } from "../src/utils/constants";
 import {
   siteValidator,
@@ -10,8 +10,6 @@ import {
   timetableEntryValidator,
   timetableValidator,
 } from "../src/utils/validators";
-
-import { TimetableEntry as PrismaTimetableEntry } from "@prisma/client";
 
 import { stripHTML } from "../src/utils/functions";
 
@@ -51,7 +49,7 @@ async function writeJSON(filename: string, data: unknown) {
 
 // A basic function to return the results of an API call, and cache it for later
 async function getDataFromAPI(url: string) {
-  const digest = md5.hashStr(url);
+  const digest = Md5.hashStr(url);
   const dir = `${__dirname}/data`;
   if (!existsSync(dir)) {
     mkdirSync(dir);
@@ -65,8 +63,6 @@ async function getDataFromAPI(url: string) {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:107.0) Gecko/20100101 Firefox/107.0",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       },
     }).then((res) => res.json());
     result = result.response;
@@ -107,8 +103,12 @@ async function main() {
               address_line_1: site.contact.address_line_1,
               address_line_2: site.contact.address_line_2,
               country: site.contact.country,
-              latitude: site.contact.latitude,
-              longitude: site.contact.longitude,
+              latitude: site.contact.latitude
+                ? Number.parseFloat(site.contact.latitude)
+                : null,
+              longitude: site.contact.longitude
+                ? Number.parseFloat(site.contact.longitude)
+                : null,
               post_code: site.contact.post_code,
               post_town: site.contact.post_town,
               telephone: site.contact.telephone,
@@ -226,7 +226,11 @@ async function main() {
         include: {
           Timetable: {
             include: {
-              site: true,
+              site: {
+                include: {
+                  contact: true,
+                },
+              },
             },
           },
         },
@@ -274,6 +278,8 @@ async function main() {
         site: {
           name: item.session.Timetable?.site.name,
           facility: item.facility_name,
+          latitude: item.session.Timetable?.site.contact.latitude,
+          longitude: item.session.Timetable?.site.contact.longitude,
         },
         level: item.level,
         instructor: item.instructor_name,
@@ -291,6 +297,8 @@ async function main() {
           site_facility: item.site.facility,
           site_name: item.site.name ?? "",
           instructor: item.instructor,
+          latitude: item.site.latitude ?? null,
+          longitude: item.site.longitude ?? null,
         },
       })
     )

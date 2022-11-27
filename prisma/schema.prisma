@@ -19,8 +19,8 @@ model SiteContact {
   country        String?
   telephone      String?
   website        String?
-  latitude       String?
-  longitude      String?
+  latitude       Float?
+  longitude      Float?
   Site           Site[]
 }
 
@@ -98,5 +98,7 @@ model AllEvents {
   site_name     String
   site_facility String
   instructor    String
+  latitude      Float?
+  longitude     Float?
   level         Int
 }
